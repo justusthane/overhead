@@ -131,3 +131,4 @@ dmypy.json
 # Project specific
 index.html
 *.swp
+plane.json

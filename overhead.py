@@ -17,24 +17,9 @@ headers = {
     'TE': 'trailers'
 }
 
-templateString = """
-<html>
-<head>
-<title>Overhead</title>
-</head>
-<body>
-<ul>
-<li>Registration: ${reg}
-<li>Departure airport: ${dptAirport}
-<li>Arrival airport: ${arrAirport}
-<li>Altiude: ${altitude}
-<li>Type: ${type}
-</body>
-</html>
-"""
-
-
-template = Template(templateString)
+f = open("/var/www/overhead/template.html","r")
+template = Template(f.read())
+f.close()
 
 response = requests.get(url, headers=headers)
 responseJson = response.json()
@@ -43,8 +28,9 @@ if responseJson['stats']['visible']['ads-b'] == 0:
 else:
     for key in responseJson:
         if key != "full_count" and key != "version" and key != "stats":
+            time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
             f = open("/root/planelog.txt","a")
-            f.write(datetime.now().strftime("%m/%d/%Y, %H:%M:%S") + "\n")
+            f.write(time + "\n")
             f.write("Plane! Plane! Plane!\n")
             f.write("Key: " + key + "\n")
             #f.write(json.dumps(responseJson[key]))
@@ -53,13 +39,18 @@ else:
             f.write("\n\n")
             f.close()
             planeDict = {
+                'time': time,
                 'reg': responseJson[key][9],
                 'dptAirport': responseJson[key][11],
                 'arrAirport': responseJson[key][12],
                 'altitude': responseJson[key][4],
+                'flight': responseJson[key][13],
                 'type': responseJson[key][8]
                 }
             f = open("/var/www/overhead/index.html","w")
             f.write(template.safe_substitute(planeDict))
+            f.close()
+            f = open("/var/www/overhead/plane.json","w")
+            f.write(json.dumps(responseJson))
             f.close()
 
