@@ -2,15 +2,14 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Overhead</title>
+<style type="text/css">
+body {
+  font-size: 3rem;
+  color: #4a4a4a;
+}
+</style>
 </head>
 <body>
-<ul>
-<li>Time: <strong>${time}</strong>
-<li>Registration: <strong>${reg}</strong>
-<li>Departure airport: <strong>${dptAirport}</strong>
-<li>Arrival airport: <strong>${arrAirport}</strong>
-<li>Altiude: <strong>${altitude}ft</strong>
-<li>Type: <strong>${type}</strong>
-<li>Flight #: <strong>${flight}</strong>
+  <p>On <strong>${date}</strong> at <strong>${time}</strong> a <strong>${type}</strong>, flight number <strong>${flight}</strong>, flew overhead at <strong>${altitude}</strong> feet on its way from <strong>${dptAirport}</strong> to <strong>${arrAirport}</strong>.</p>
 </body>
 </html>
