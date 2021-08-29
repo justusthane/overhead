@@ -6,10 +6,28 @@
 body {
   font-size: 3rem;
   color: #4a4a4a;
+  background: url("/images/${type}.png") no-repeat;
+  background-size: 100%;
+  background-position: 50%;
+}
+a {
+  color: #4a4a4a;
+  text-decoration-color: #4a4a4a;
+  text-decoration-thickness: .05em;
+  text-underline-offset: 3px;
+  text-decoration-style: dashed;
+}
+
+.cover {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255,255,255,0.6);
 }
 </style>
 </head>
 <body>
-  <p>On <strong>${date}</strong> at <strong>${time}</strong> a <strong>${type}</strong>, flight number <strong>${flight}</strong>, flew overhead at <strong>${altitude}</strong> feet on its way from <strong>${dptAirport}</strong> to <strong>${arrAirport}</strong>.</p>
+  <div class="cover">
+  <p>On <strong>${date}</strong> at <strong>${time}</strong> a <strong>${type}</strong>, flight number <strong>${flight}</strong>, flew overhead at <strong>${altitude}</strong> feet on its way from <strong><a href="#" title="${dptCity}">${dptAirport}</a></strong> to <strong><a href="#" title="${arrCity}">${arrAirport}</a></strong>.</p>
+  </div>
 </body>
 </html>
