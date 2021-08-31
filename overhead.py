@@ -1,121 +1,148 @@
+# Need this one to make HTTP requests
 import requests
+# And this one to to work with the returned JSON data
 import json
+# This one is for regular expressions
 import re
+# This one for returning the date in a format someone would want to look at
 from datetime import datetime
+# And this is used for creating an HTML template for the output
 from string import Template
 
-# Tighter
-#url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.395%2C48.382%2C-89.279%2C-89.229&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1"
-# Wider
-url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.409%2C48.372%2C-89.303%2C-89.204&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1&enc=2pTPB4GJMn0wdAbgolLJRTUxG5Nlh_09-NywvmbUW1o"
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0',
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Referer': 'https://www.flightradar24.com/',
-    'Origin': 'https://www.flightradar24.com',
-    'Alt-Used': 'data-live.flightradar24.com',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-site',
-    'TE': 'trailers'
-}
+# This is the meat and potatoes. Get visible planes in the airspace
+def getPlanes():
+    # This is a tight little airspace
+    #url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.395%2C48.382%2C-89.279%2C-89.229&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1"
+    # This is a wider airspace to give us a better chance of capturing the planes as they fly overhead
+    url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.409%2C48.372%2C-89.303%2C-89.204&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1&enc=2pTPB4GJMn0wdAbgolLJRTUxG5Nlh_09-NywvmbUW1o"
+    # Copied these HTTP headers from Firefox
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Referer': 'https://www.flightradar24.com/',
+        'Origin': 'https://www.flightradar24.com',
+        'Alt-Used': 'data-live.flightradar24.com',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'TE': 'trailers'
+    }
+    # Call the API, save the response.
+    response = requests.get(url, headers=headers)
+    return response.json()
 
-def getAirportInfo(airport):
-    url = f"https://www.flightradar24.com/airports/traffic-stats/?airport={airport}"
-    return requests.get(url, headers=headers).json()
-    
+# This is just a silly function to check if the input exists and return "???" if not
+# It's used if the airport codes aren't listed in the API response.
 def exists(input):
     if input:
         return input
     else:
         return "???"
 
+# Let's see if we can get the name of the airport
 def getAirportName(airport):
+    # Check if an airport code was provided
     if airport:
+        # If it was, query the flightradar24 API for the airport code
         url = f"https://www.flightradar24.com/airports/traffic-stats/?airport={airport}"
         response = requests.get(url, headers=headers).json()
+        # If airport details and a name are returned...well...return them.
         if response['details']['name']:
             return response['details']['name']
+    # No airport info, so sad :(
     return "No airport info found"
 
-
-#def getPlaneJson(input):
-#    for key in input:
-#        if key != "full_count" and key != "version" and key != "stats":
-#            return input[key]           
+# Since the flightradar24 API only returns the ICAO typecode (e.g. "B789"), 
+# let's try and get a model number (e.g. "Boeing 787-9 Dreamliner") from 
+# opensky-network.org using the plane's registration number (e.g. "PH-BHO")
+# The ICAO typecode is also provdided as a fallback.
+def getPlaneModel(registration, type):
+    # Check if a registration number was provided
+    if registration:
+        # If it was, call the API
+        url = f"https://opensky-network.org/api/metadata/aircraft/list?n=50&p=1&q={registration}"
+        response = requests.get(url).json()
+        # Check if the response contains model info
+        if 'model' in response['content'][0]:
+            # If it does, return it!
+            return response['content'][0]['model']
+    # If any or all of the above failes, just return the ICAO typecode that was provided
+    return type
 
 
 # The JSON key representing the plane object (if there is one) is an 8-digit hexadecimal number. This is for finding it.
+# Note that if there are multiple planes in the airspace, only one will be returned.
 planeKeyRegEx = re.compile('[0-9a-f]{8}')
 def getPlaneKey(input):
     for key in input:
         if planeKeyRegEx.match(key):
             return key          
 
-# Load the HTML template
+# Load the HTML template and save it to the `template` variable for later use.
 f = open("/var/www/overhead/template.html","r")
 template = Template(f.read())
 f.close()
 
-# Call the API
-response = requests.get(url, headers=headers)
-responseJson = response.json()
-
+# Let's get our planes!
+planeJson = getPlanes()
 # If no planes are in the sky right now, load the JSON from the last plane.
 # This is so the HTML can be regenerated each time in case any changes
 # have been made
-if responseJson['stats']['visible']['ads-b'] == 0:
+if planeJson['stats']['visible']['ads-b'] == 0:
     print("No planes in the sky" + "\n")
     f = open("/var/www/overhead/plane.json")
-    responseJson = json.load(f)
+    planeJson = json.load(f)
     f.close()
-# A plane is in the sky
+# Plane! Plane! Plane!
 else:
     # Get the key representing the plane data
-    key = getPlaneKey(responseJson)
+    key = getPlaneKey(planeJson)
     # Write the current date and time into the JSON data so it can be
-    # reused next time
-    responseJson['stats']['date'] = datetime.now().strftime("%b %d")
-    responseJson['stats']['time'] = datetime.now().strftime("%H:%M")
+    # reused each time this HTML file is generated for this particular plane. 
+    planeJson['stats']['date'] = datetime.now().strftime("%b %d")
+    planeJson['stats']['time'] = datetime.now().strftime("%H:%M")
     # Log to the text file
     f = open("/root/planelog.txt","a")
-    f.write(responseJson['stats']['date'] + " " + responseJson['stats']['time'] + "\n")
+    f.write(planeJson['stats']['date'] + " " + planeJson['stats']['time'] + "\n")
     f.write("Plane! Plane! Plane!\n")
     f.write("Key: " + key + "\n")
-    #f.write(json.dumps(responseJson[key]))
+    #f.write(json.dumps(planeJson[key]))
     # Loop through each element of the plane data array and print it along with the index.
-    for i in range(len(responseJson[key])):
-            f.write(str(i) + ": " + str(responseJson[key][i]) + "\n")
+    for i in range(len(planeJson[key])):
+            f.write(str(i) + ": " + str(planeJson[key][i]) + "\n")
     f.write("\n\n")
     f.close()
-    # Write the JSON to a file so it can be read next time if there's no plane.
+    # Write the JSON to a file so it can used below since there's no new plane.
     f = open("/var/www/overhead/plane.json","w")
-    f.write(json.dumps(responseJson))
+    f.write(json.dumps(planeJson))
     f.close()
 
-# Generate the HTML file, using either the current JSON data or the JSON data of the previous plane,
-# loaded from the file.
-key = getPlaneKey(responseJson)
-dptAirportJson = getAirportInfo(responseJson[key][11])
-arrAirportJson = getAirportInfo(responseJson[key][12])
+# Whether or not there's a new plane, regenerate the HTML file
+key = getPlaneKey(planeJson)
 flightNumberList = []
-if responseJson[key][13]:
-    flightNumberList.append(responseJson[key][13])
-if responseJson[key][16]:
-    flightNumberList.append(responseJson[key][16])
+if planeJson[key][13]:
+    flightNumberList.append(planeJson[key][13])
+if planeJson[key][16]:
+    flightNumberList.append(planeJson[key][16])
+# Map the JSON from the API to meaningful properties. These properties
+# are used directly in the HTML template.
 planeDict = {
-    'time': responseJson['stats']['time'],
-    'date': responseJson['stats']['date'],
-    'reg': responseJson[key][9],
-    'dptAirport': exists(responseJson[key][11]),
-    'dptCity': getAirportName(responseJson[key][11]),
-    'arrAirport': exists(responseJson[key][12]),
-    'arrCity': getAirportName(responseJson[key][12]),
-    'altitude': responseJson[key][4],
+    'time': planeJson['stats']['time'],
+    'date': planeJson['stats']['date'],
+    'icao24': planeJson[key][0], # ICAO Mode S code
+    'reg': planeJson[key][9],
+    'dptAirport': exists(planeJson[key][11]),
+    'dptCity': getAirportName(planeJson[key][11]),
+    'arrAirport': exists(planeJson[key][12]),
+    'arrCity': getAirportName(planeJson[key][12]),
+    'altitude': planeJson[key][4],
     'flight': "/".join(flightNumberList),
-    'type': responseJson[key][8]
+    'type': planeJson[key][8], # ICAO Typecode
+    'model': getPlaneModel(planeJson[key][9],planeJson[key][8])
     }
+# Open the HTML file
 f = open("/var/www/overhead/index.html","w")
+# Write the template, substituting the values from the above dictionary.
 f.write(template.safe_substitute(planeDict))
 f.close()
