@@ -1,3 +1,9 @@
+# overhead.py
+#
+# Each time this script runs, it looks for planes in the airspace above, and generates and HTML file
+# containing the plane (or regenerates the HTML file using the data of the most recent plane if there's 
+# not a plane). It's intended to be run every 60 seconds or so (e.g. with a cron job).
+
 # Need this one to make HTTP requests
 import requests
 # And this one to to work with the returned JSON data
