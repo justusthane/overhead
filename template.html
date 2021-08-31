@@ -3,6 +3,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Overhead</title>
 <style type="text/css">
+* {
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-size: 3rem;
   color: #4a4a4a;
@@ -21,13 +26,64 @@ a {
 .cover {
   width: 100%;
   height: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
   background-color: rgba(255,255,255,0.6);
+}
+
+ /* Tooltip container */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 1.5px;
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+  font-size: 0.3em;
+  visibility: hidden;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  padding: 5px 3px;;
+  border-radius: 6px;
+
+  /* Position the tooltip text */
+  position: absolute;
+  z-index: 1;
+  bottom: 110%;
+  left: 50%;
+  margin-left: -60px;
+
+  /* Fade in tooltip */
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
 }
 </style>
 </head>
 <body>
   <div class="cover">
-  <p>On <strong>${date}</strong> at <strong>${time}</strong> a <strong>${type}</strong>, flight number <strong>${flight}</strong>, flew overhead at <strong>${altitude}</strong> feet on its way from <strong><a href="#" title="${dptCity}">${dptAirport}</a></strong> to <strong><a href="#" title="${arrCity}">${arrAirport}</a></strong>.</p>
+    <p>On <strong>${date}</strong> at <strong>${time}</strong> a <strong>${type}</strong>, flight number <strong>${flight}</strong>, flew overhead at <strong>${altitude}</strong> feet on its way from <span class="tooltip"><strong>${dptAirport}</strong><span class="tooltiptext">${dptCity}</span></span> to <span class="tooltip"><strong>${arrAirport}</strong><span class="tooltiptext">${arrCity}</span></span>.</p>
   </div>
 </body>
 </html>
