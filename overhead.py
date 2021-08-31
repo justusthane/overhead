@@ -31,6 +31,15 @@ def exists(input):
     else:
         return "???"
 
+def getAirportName(airport):
+    if airport:
+        url = f"https://www.flightradar24.com/airports/traffic-stats/?airport={airport}"
+        response = requests.get(url, headers=headers).json()
+        if response['details']['name']:
+            return response['details']['name']
+    return "No airport info found"
+
+
 #def getPlaneJson(input):
 #    for key in input:
 #        if key != "full_count" and key != "version" and key != "stats":
@@ -43,11 +52,6 @@ def getPlaneKey(input):
     for key in input:
         if planeKeyRegEx.match(key):
             return key          
-
-airports = {
-    "YQT": "Thunder Bay",
-    "YQK": "Kenora"
-}
 
 # Load the HTML template
 f = open("/var/www/overhead/template.html","r")
@@ -73,7 +77,7 @@ else:
     # Write the current date and time into the JSON data so it can be
     # reused next time
     responseJson['stats']['date'] = datetime.now().strftime("%b %d")
-    responseJson['stats']['time'] = datetime.now().strftime("%H:%M:%S")
+    responseJson['stats']['time'] = datetime.now().strftime("%H:%M")
     # Log to the text file
     f = open("/root/planelog.txt","a")
     f.write(responseJson['stats']['date'] + " " + responseJson['stats']['time'] + "\n")
@@ -95,20 +99,23 @@ else:
 key = getPlaneKey(responseJson)
 dptAirportJson = getAirportInfo(responseJson[key][11])
 arrAirportJson = getAirportInfo(responseJson[key][12])
+flightNumberList = []
+if responseJson[key][13]:
+    flightNumberList.append(responseJson[key][13])
+if responseJson[key][16]:
+    flightNumberList.append(responseJson[key][16])
 planeDict = {
     'time': responseJson['stats']['time'],
     'date': responseJson['stats']['date'],
     'reg': responseJson[key][9],
     'dptAirport': exists(responseJson[key][11]),
+    'dptCity': getAirportName(responseJson[key][11]),
     'arrAirport': exists(responseJson[key][12]),
+    'arrCity': getAirportName(responseJson[key][12]),
     'altitude': responseJson[key][4],
-    'flight': responseJson[key][16],
+    'flight': "/".join(flightNumberList),
     'type': responseJson[key][8]
     }
-if 'details' in dptAirportJson:
-    planeDict['dptCity'] = dptAirportJson['details']['name']
-if 'details' in arrAirportJson:
-    planeDict['arrCity'] = arrAirportJson['details']['name']
 f = open("/var/www/overhead/index.html","w")
 f.write(template.safe_substitute(planeDict))
 f.close()
