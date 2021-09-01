@@ -132,3 +132,5 @@ dmypy.json
 index.html
 *.swp
 plane.json
+plane.json.*
+*.json
