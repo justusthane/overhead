@@ -15,25 +15,26 @@ from datetime import datetime
 # And this is used for creating an HTML template for the output
 from string import Template
 
+# Copied these HTTP headers from Firefox
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Referer': 'https://www.flightradar24.com/',
+    'Origin': 'https://www.flightradar24.com',
+    'Alt-Used': 'data-live.flightradar24.com',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
+    'TE': 'trailers'
+}
+
 # This is the meat and potatoes. Get visible planes in the airspace
 def getPlanes():
     # This is a tight little airspace
     #url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.395%2C48.382%2C-89.279%2C-89.229&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1"
     # This is a wider airspace to give us a better chance of capturing the planes as they fly overhead
     url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?faa=1&bounds=48.409%2C48.372%2C-89.303%2C-89.204&satellite=1&mlat=1&flarm=1&adsb=1&gnd=1&air=1&vehicles=1&estimated=1&maxage=14400&gliders=1&stats=1&enc=2pTPB4GJMn0wdAbgolLJRTUxG5Nlh_09-NywvmbUW1o"
-    # Copied these HTTP headers from Firefox
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Referer': 'https://www.flightradar24.com/',
-        'Origin': 'https://www.flightradar24.com',
-        'Alt-Used': 'data-live.flightradar24.com',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-site',
-        'TE': 'trailers'
-    }
     # Call the API, save the response.
     response = requests.get(url, headers=headers)
     return response.json()
@@ -70,9 +71,10 @@ def getPlaneModel(registration, type):
         url = f"https://opensky-network.org/api/metadata/aircraft/list?n=50&p=1&q={registration}"
         response = requests.get(url).json()
         # Check if the response contains model info
-        if 'model' in response['content'][0]:
-            # If it does, return it!
-            return response['content'][0]['model']
+        if 0 in response['content']:
+            if 'model' in response['content'][0]:
+                # If it does, return it!
+                return response['content'][0]['model']
     # If any or all of the above failes, just return the ICAO typecode that was provided
     return type
 
