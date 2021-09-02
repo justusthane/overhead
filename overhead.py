@@ -78,6 +78,13 @@ def getPlaneModel(registration, type):
     # If any or all of the above failes, just return the ICAO typecode that was provided
     return type
 
+def concatFlightNums(flightNums):
+    flightNumberList = []
+    for flightNum in flightNums:
+        if flightNum:
+            flightNumberList.append(flightNum)
+    return "/".join(flightNumberList)
+
 
 # The JSON key representing the plane object (if there is one) is an 8-digit hexadecimal number. This is for finding it.
 # Note that if there are multiple planes in the airspace, only one will be returned.
@@ -114,7 +121,7 @@ else:
     f = open("/root/planelog.txt","a")
     f.write(planeJson['stats']['date'] + " " + planeJson['stats']['time'] + "\n")
     f.write("Plane! Plane! Plane!\n")
-    f.write("Key: " + key + "\n")
+    f.write("Key: " + str(key) + "\n")
     #f.write(json.dumps(planeJson[key]))
     # Loop through each element of the plane data array and print it along with the index.
     for i in range(len(planeJson[key])):
@@ -128,11 +135,6 @@ else:
 
 # Whether or not there's a new plane, regenerate the HTML file
 key = getPlaneKey(planeJson)
-flightNumberList = []
-if planeJson[key][13]:
-    flightNumberList.append(planeJson[key][13])
-if planeJson[key][16]:
-    flightNumberList.append(planeJson[key][16])
 # Map the JSON from the API to meaningful properties. These properties
 # are used directly in the HTML template.
 planeDict = {
@@ -145,7 +147,7 @@ planeDict = {
     'arrAirport': exists(planeJson[key][12]),
     'arrCity': getAirportName(planeJson[key][12]),
     'altitude': planeJson[key][4],
-    'flight': "/".join(flightNumberList),
+    'flight': concatFlightNums([planeJson[key][13], planeJson[key][16]]),
     'type': planeJson[key][8], # ICAO Typecode
     'model': getPlaneModel(planeJson[key][9],planeJson[key][8])
     }
