@@ -14,6 +14,8 @@ import re
 from datetime import datetime
 # And this is used for creating an HTML template for the output
 from string import Template
+# For storing/retrieving plane data
+import sqlite3
 
 # Copied these HTTP headers from Firefox
 headers = {
@@ -99,6 +101,9 @@ f = open("/var/www/overhead/template.html","r")
 template = Template(f.read())
 f.close()
 
+con = sqlite3.connect("/var/www/overhead/overhead.db")
+cur = con.cursor()
+
 # Let's get our planes!
 planeJson = getPlanes()
 # If no planes are in the sky right now, load the JSON from the last plane.
@@ -128,10 +133,41 @@ else:
             f.write(str(i) + ": " + str(planeJson[key][i]) + "\n")
     f.write("\n\n")
     f.close()
-    # Write the JSON to a file so it can used below since there's no new plane.
+    # Write the JSON to a file so it can used below.
     f = open("/var/www/overhead/plane.json","w")
     f.write(json.dumps(planeJson))
     f.close()
+    seqPlaneInfo = (
+        planeJson[key][0],
+        planeJson['stats']['date'],
+        planeJson['stats']['time'],
+        planeJson[key][0], # ICAO Mode S code
+        planeJson[key][9],
+        exists(planeJson[key][11]),
+        getAirportName(planeJson[key][11]),
+        exists(planeJson[key][12]),
+        getAirportName(planeJson[key][12]),
+        planeJson[key][4],
+        planeJson[key][13],
+        planeJson[key][16],
+        planeJson[key][8], # ICAO Typecode
+        getPlaneModel(planeJson[key][9],planeJson[key][8]),
+        planeJson[key][1],
+        planeJson[key][2],
+        planeJson[key][3],
+        planeJson[key][5],
+        planeJson[key][6],
+        planeJson[key][7],
+        planeJson[key][10],
+        planeJson[key][14],
+        planeJson[key][15],
+        planeJson[key][17],
+        planeJson[key][18]
+    )
+    # I hate this
+    cur.execute("INSERT INTO planelog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seqPlaneInfo)
+    con.commit()
+
 
 # Whether or not there's a new plane, regenerate the HTML file
 key = getPlaneKey(planeJson)
@@ -156,3 +192,4 @@ f = open("/var/www/overhead/index.html","w")
 # Write the template, substituting the values from the above dictionary.
 f.write(template.safe_substitute(planeDict))
 f.close()
+con.close()
