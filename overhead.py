@@ -102,6 +102,8 @@ template = Template(f.read())
 f.close()
 
 con = sqlite3.connect("/var/www/overhead/overhead.db")
+# This allows us to access column values by column name
+con.row_factory = sqlite3.Row
 cur = con.cursor()
 
 # Let's get our planes!
@@ -169,27 +171,31 @@ else:
     con.commit()
 
 
-# Whether or not there's a new plane, regenerate the HTML file
-key = getPlaneKey(planeJson)
-# Map the JSON from the API to meaningful properties. These properties
-# are used directly in the HTML template.
-planeDict = {
-    'time': planeJson['stats']['time'],
-    'date': planeJson['stats']['date'],
-    'icao24': planeJson[key][0], # ICAO Mode S code
-    'reg': planeJson[key][9],
-    'dptAirport': exists(planeJson[key][11]),
-    'dptCity': getAirportName(planeJson[key][11]),
-    'arrAirport': exists(planeJson[key][12]),
-    'arrCity': getAirportName(planeJson[key][12]),
-    'altitude': planeJson[key][4],
-    'flight': concatFlightNums([planeJson[key][13], planeJson[key][16]]),
-    'type': planeJson[key][8], # ICAO Typecode
-    'model': getPlaneModel(planeJson[key][9],planeJson[key][8])
-    }
-# Open the HTML file
-f = open("/var/www/overhead/index.html","w")
-# Write the template, substituting the values from the above dictionary.
-f.write(template.safe_substitute(planeDict))
-f.close()
+cur.execute("SELECT * FROM planelog ORDER BY id DESC LIMIT 5")
+rows = cur.fetchall()
+
+for i, row in enumerate(rows):
+    # Whether or not there's a new plane, regenerate the HTML file
+    # Map the JSON from the API to meaningful properties. These properties
+    # are used directly in the HTML template.
+    planeDict = {
+        'time': row['time'],
+        'date': row['date'],
+        'icao24': row['icao24'], # ICAO Mode S code
+        'reg': row['reg'],
+        'dptAirport': row['dptAirport'],
+        'dptCity': row['dptCity'],
+        'arrAirport': row['arrAirport'],
+        'arrCity': row['arrCity'],
+        'altitude': row['altitude'],
+        'flight': concatFlightNums([row['flight1'], row['flight2']]),
+        'type': row['type'], # ICAO Typecode
+        'model': row['model']
+        }
+    # Open the HTML file
+    f = open(f"/var/www/overhead/{ 'index' if i == 0 else i }.html","w")
+    # Write the template, substituting the values from the above dictionary.
+    f.write(template.safe_substitute(planeDict))
+    f.close()
+
 con.close()
