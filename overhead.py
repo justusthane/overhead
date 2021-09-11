@@ -5,6 +5,7 @@
 # not a plane). It's intended to be run every 60 seconds or so (e.g. with a cron job).
 
 # Need this one to make HTTP requests
+from os import truncate
 import requests
 # And this one to to work with the returned JSON data
 import json
@@ -13,9 +14,11 @@ import re
 # This one for returning the date in a format someone would want to look at
 from datetime import datetime
 # And this is used for creating an HTML template for the output
-from string import Template
+#from string import Template
 # For storing/retrieving plane data
 import sqlite3
+from jinja2 import Template
+
 
 # Copied these HTTP headers from Firefox
 headers = {
@@ -72,11 +75,10 @@ def getPlaneModel(registration, type):
         # If it was, call the API
         url = f"https://opensky-network.org/api/metadata/aircraft/list?n=50&p=1&q={registration}"
         response = requests.get(url).json()
-        # Check if the response contains model info
-        if 0 in response['content']:
-            if 'model' in response['content'][0]:
-                # If it does, return it!
-                return response['content'][0]['model']
+        try:
+            return response['content'][0]['model']
+        except IndexError:
+            return type
     # If any or all of the above failes, just return the ICAO typecode that was provided
     return type
 
@@ -96,6 +98,15 @@ def getPlaneKey(input):
         if planeKeyRegEx.match(key):
             return key          
 
+def newPlane(input, con):
+    cur = con.cursor()
+    cur.execute("SELECT * FROM planelog ORDER BY rowid DESC LIMIT 5")
+    rows = cur.fetchall()
+    for row in rows:
+        if input in row:
+            return False
+    return True
+
 # Load the HTML template and save it to the `template` variable for later use.
 f = open("/var/www/overhead/template.html","r")
 template = Template(f.read())
@@ -108,14 +119,17 @@ cur = con.cursor()
 
 # Let's get our planes!
 planeJson = getPlanes()
+#f = open("/var/www/overhead/plane.json")
+#planeJson = json.load(f)
+#f.close()
 # If no planes are in the sky right now, load the JSON from the last plane.
 # This is so the HTML can be regenerated each time in case any changes
 # have been made
 if planeJson['stats']['visible']['ads-b'] == 0:
     print("No planes in the sky" + "\n")
-    f = open("/var/www/overhead/plane.json")
-    planeJson = json.load(f)
-    f.close()
+    #f = open("/var/www/overhead/plane.json")
+    #planeJson = json.load(f)
+    #f.close()
 # Plane! Plane! Plane!
 else:
     # Get the key representing the plane data
@@ -135,43 +149,46 @@ else:
             f.write(str(i) + ": " + str(planeJson[key][i]) + "\n")
     f.write("\n\n")
     f.close()
-    # Write the JSON to a file so it can used below.
+    #Write the JSON to a file so it can used below.
     f = open("/var/www/overhead/plane.json","w")
     f.write(json.dumps(planeJson))
     f.close()
-    seqPlaneInfo = (
-        planeJson[key][0],
-        planeJson['stats']['date'],
-        planeJson['stats']['time'],
-        planeJson[key][0], # ICAO Mode S code
-        planeJson[key][9],
-        exists(planeJson[key][11]),
-        getAirportName(planeJson[key][11]),
-        exists(planeJson[key][12]),
-        getAirportName(planeJson[key][12]),
-        planeJson[key][4],
-        planeJson[key][13],
-        planeJson[key][16],
-        planeJson[key][8], # ICAO Typecode
-        getPlaneModel(planeJson[key][9],planeJson[key][8]),
-        planeJson[key][1],
-        planeJson[key][2],
-        planeJson[key][3],
-        planeJson[key][5],
-        planeJson[key][6],
-        planeJson[key][7],
-        planeJson[key][10],
-        planeJson[key][14],
-        planeJson[key][15],
-        planeJson[key][17],
-        planeJson[key][18]
-    )
-    # I hate this
-    cur.execute("INSERT INTO planelog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seqPlaneInfo)
-    con.commit()
+
+    # Check if this is a new plane (i.e. one we haven't already saved to the database)
+    if newPlane(key, con):
+        seqPlaneInfo = (
+            key,
+            planeJson['stats']['date'],
+            planeJson['stats']['time'],
+            planeJson[key][0], # ICAO Mode S code
+            planeJson[key][9],
+            exists(planeJson[key][11]),
+            getAirportName(planeJson[key][11]),
+            exists(planeJson[key][12]),
+            getAirportName(planeJson[key][12]),
+            planeJson[key][4],
+            planeJson[key][13],
+            planeJson[key][16],
+            planeJson[key][8], # ICAO Typecode
+            getPlaneModel(planeJson[key][9],planeJson[key][8]),
+            planeJson[key][1],
+            planeJson[key][2],
+            planeJson[key][3],
+            planeJson[key][5],
+            planeJson[key][6],
+            planeJson[key][7],
+            planeJson[key][10],
+            planeJson[key][14],
+            planeJson[key][15],
+            planeJson[key][17],
+            planeJson[key][18]
+        )
+        # I hate this
+        cur.execute("INSERT INTO planelog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", seqPlaneInfo)
+        con.commit()
 
 
-cur.execute("SELECT * FROM planelog ORDER BY id DESC LIMIT 5")
+cur.execute("SELECT * FROM planelog ORDER BY rowid DESC LIMIT 5")
 rows = cur.fetchall()
 
 for i, row in enumerate(rows):
@@ -179,6 +196,8 @@ for i, row in enumerate(rows):
     # Map the JSON from the API to meaningful properties. These properties
     # are used directly in the HTML template.
     planeDict = {
+        'nextLink': f"{i-1}.html",
+        'prevLink': f"{i+1}.html",
         'time': row['time'],
         'date': row['date'],
         'icao24': row['icao24'], # ICAO Mode S code
@@ -192,10 +211,22 @@ for i, row in enumerate(rows):
         'type': row['type'], # ICAO Typecode
         'model': row['model']
         }
+    if i == 0:
+        planeDict['nextLink'] = "#"
+    elif i == 1:
+        planeDict['nextLink'] = "index.html"
+    elif i == len(rows) - 1:
+        planeDict['prevLink'] =  "#" 
     # Open the HTML file
     f = open(f"/var/www/overhead/{ 'index' if i == 0 else i }.html","w")
-    # Write the template, substituting the values from the above dictionary.
-    f.write(template.safe_substitute(planeDict))
+    ## Write the template, substituting the values from the above dictionary.
+    #f.write(template.safe_substitute(planeDict))
+    with open("/var/www/overhead/templates/template.html", "r") as fh:
+        jinjaTemplate = Template(fh.read())
+    f.write(jinjaTemplate.render(planeDict))
     f.close()
+
+    
+
 
 con.close()
